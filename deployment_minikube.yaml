@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: proxy-deployment
+  namespace: smart-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: proxy-app
+  template:
+    metadata:
+      labels:
+        app: proxy-app
+    spec:
+      serviceAccountName: smart-agent-reader
+      containers:
+        - name: my-agent
+          image: my-agent
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8081
+              protocol: TCP
+            - containerPort: 8082
+              protocol: TCP
+            - containerPort: 8083
+              protocol: UDP
+            - containerPort: 8084
+              protocol: UDP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: proxy-service
+  namespace: smart-agent
+spec:
+  selector:
+    app: proxy-app
+  type: NodePort
+  ports:
+    - name: "client-port"
+      protocol: TCP
+      port: 8081
+      targetPort: 8081
+    - name: "ping-port"
+      protocol: UDP
+      port: 8083
+      targetPort: 8083
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cluster-service
+  namespace: smart-agent
+spec:
+  selector:
+    app: proxy-app
+  type: ClusterIP
+  ports:
+    - name: "cluster-port"
+      protocol: TCP
+      port: 8082
+      targetPort: 8082
+    - name: "monitor-port"
+      protocol: TCP
+      port: 8084
+      targetPort: 8084
