@@ -590,31 +590,34 @@ func (ser *AgentServer) handleTransfer(conn net.Conn) {
 	}
 }
 
-// 只能确定server先获取每个server的ip，如何进行测试
 func (ser *AgentServer) GetNetworkAwareness() {
-
 	servers := ser.k8sCli.GetNameSpacePods(config.Namespace)
-	ch := make(chan string, len(servers)*2)
+	ch := make(chan string, len(servers)-1)
+	localIpaddr := getIPv4ForInterface("eth0")
+
+	localServerName := ""
+	for _, server := range servers {
+		if localIpaddr == server.PodIP {
+			localServerName = server.PodName
+		}
+	}
+
 	for _, server := range servers {
 		serverIp := server.PodIP
 		serverName := server.PodName
-		go func(ip string) {
-			result, err := runIperfCommand(ip)
+		if localIpaddr != serverIp {
+			result, err := runIperfCommand(serverIp)
+			packetLoss, avgRTT, err := runPingCommand(serverIp)
 			if err == nil {
-				ch <- fmt.Sprintf("IPERF Result for %s: %s\n", serverName, result)
+				ch <- fmt.Sprintf("%s - %s: %s - Packet Loss - %s, Average RTT - %s\n", localServerName, serverName, result, packetLoss, avgRTT)
+			} else {
+				ch <- fmt.Sprintf("%s\n", err)
 			}
-		}(serverIp)
-
-		go func(ip string) {
-			packetLoss, avgRTT, err := runPingCommand(ip)
-			if err == nil {
-				ch <- fmt.Sprintf("PING Result for %s: Packet Loss - %s, Average RTT - %s\n", serverName, packetLoss, avgRTT)
-			}
-		}(serverIp)
+		}
 	}
 
 	var result strings.Builder
-	for i := 0; i < len(servers)*2; i++ {
+	for i := 0; i < len(servers)-1; i++ {
 		result.WriteString(<-ch)
 	}
 	err := os.WriteFile("data.txt", []byte(result.String()), 0644)
@@ -665,4 +668,31 @@ func runPingCommand(serverIp string) (string, string, error) {
 	//fmt.Println("Packet Loss:", packetLoss)
 	//fmt.Println("Average RTT:", avgRTT)
 	return packetLoss, avgRTT, nil
+}
+
+func getIPv4ForInterface(ifaceName string) string {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return ""
+	}
+
+	for _, iface := range interfaces {
+		if iface.Name == ifaceName {
+			addrs, err := iface.Addrs()
+			if err != nil {
+				return ""
+			}
+
+			for _, addr := range addrs {
+				ipNet, ok := addr.(*net.IPNet)
+				if ok && !ipNet.IP.IsLoopback() {
+					if ipNet.IP.To4() != nil {
+						return ipNet.IP.String()
+					}
+				}
+			}
+		}
+	}
+
+	return ""
 }
