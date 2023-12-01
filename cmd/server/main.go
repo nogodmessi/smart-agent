@@ -602,6 +602,15 @@ func (ser *AgentServer) GetNetworkAwareness() {
 			localServerName = server.PodName
 		}
 	}
+	content, err1 := ioutil.ReadFile("node.txt")
+	if err1 != nil {
+		fmt.Println("Error reading file:", err1)
+		return
+	}
+
+	nodeName := strings.TrimSpace(string(content))
+
+	ser.k8sCli.EtcdPut(localServerName, nodeName)
 
 	for _, server := range servers {
 		serverIp := server.PodIP
@@ -609,10 +618,11 @@ func (ser *AgentServer) GetNetworkAwareness() {
 		if localIpaddr != serverIp {
 			result, err := runIperfCommand(serverIp)
 			packetLoss, avgRTT, err := runPingCommand(serverIp)
+			otherName,_ := ser.k8sCli.EtcdGet(serverName)
 			if err == nil {
-				ch <- fmt.Sprintf("%s and %s: %s\n", localServerName, serverName, result)
-				ch <- fmt.Sprintf("%s and %s: %s\n", localServerName, serverName, packetLoss)
-				ch <- fmt.Sprintf("%s and %s: %s\n", localServerName, serverName, avgRTT)
+				ch <- fmt.Sprintf("%s and %s: %s\n", nodeName, otherName, result)
+				ch <- fmt.Sprintf("%s and %s: %s\n", nodeName, otherName, packetLoss)
+				ch <- fmt.Sprintf("%s and %s: %s\n", nodeName, otherName, avgRTT)
 			} else {
 				ch <- fmt.Sprintf("%s\n", err)
 			}
