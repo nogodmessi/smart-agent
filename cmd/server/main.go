@@ -590,9 +590,10 @@ func (ser *AgentServer) handleTransfer(conn net.Conn) {
 	}
 }
 
+// 只能确定server先获取每个server的ip，如何进行测试
 func (ser *AgentServer) GetNetworkAwareness() {
 	servers := ser.k8sCli.GetNameSpacePods(config.Namespace)
-	ch := make(chan string, len(servers)-1)
+	ch := make(chan string, (len(servers)-1)*3)
 	localIpaddr := getIPv4ForInterface("eth0")
 
 	localServerName := ""
@@ -609,7 +610,9 @@ func (ser *AgentServer) GetNetworkAwareness() {
 			result, err := runIperfCommand(serverIp)
 			packetLoss, avgRTT, err := runPingCommand(serverIp)
 			if err == nil {
-				ch <- fmt.Sprintf("%s - %s: %s - Packet Loss - %s, Average RTT - %s\n", localServerName, serverName, result, packetLoss, avgRTT)
+				ch <- fmt.Sprintf("%s and %s: %s\n", localServerName, serverName, result)
+				ch <- fmt.Sprintf("%s and %s: %s\n", localServerName, serverName, packetLoss)
+				ch <- fmt.Sprintf("%s and %s: %s\n", localServerName, serverName, avgRTT)
 			} else {
 				ch <- fmt.Sprintf("%s\n", err)
 			}
@@ -617,7 +620,7 @@ func (ser *AgentServer) GetNetworkAwareness() {
 	}
 
 	var result strings.Builder
-	for i := 0; i < len(servers)-1; i++ {
+	for i := 0; i < (len(servers)-1)*3; i++ {
 		result.WriteString(<-ch)
 	}
 	err := os.WriteFile("data.txt", []byte(result.String()), 0644)
@@ -625,7 +628,6 @@ func (ser *AgentServer) GetNetworkAwareness() {
 		fmt.Println("Error writing to file:", err)
 	}
 }
-
 // 实现客户端发送iperf命令 （测试吞吐量以及带宽）
 func runIperfCommand(serverIp string) (string, error) {
 	cmd := exec.Command("iperf", "-c", serverIp, "-t", "1")
@@ -635,7 +637,9 @@ func runIperfCommand(serverIp string) (string, error) {
 		return "", err
 	}
 	lastline := extractLastLine(string(output))
-	return lastline, err
+	parts := strings.Split(lastline," ")
+	bandwidth := parts[len(parts) - 2] + parts[len(parts) - 1]
+	return bandwidth, err
 }
 
 func extractLastLine(output string) string {
@@ -646,9 +650,9 @@ func extractLastLine(output string) string {
 	return ""
 }
 
-// 实现客户端发送ping命令（测4次的平均时延以及数据丢失率）
+// 实现客户端发送ping命令（测10次的平均时延以及数据丢失率）
 func runPingCommand(serverIp string) (string, string, error) {
-	cmd := exec.Command("ping", "-c", "4", serverIp)
+	cmd := exec.Command("ping", "-c", "10", serverIp)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	err := cmd.Run()
