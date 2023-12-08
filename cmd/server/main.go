@@ -662,7 +662,7 @@ func extractLastLine(output string) string {
 
 // 实现客户端发送ping命令（测10次的平均时延以及数据丢失率）
 func runPingCommand(serverIp string) (string, string, error) {
-	cmd := exec.Command("ping", "-c", "10", serverIp)
+	cmd := exec.Command("ping", "-c", "100", serverIp)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	err := cmd.Run()
