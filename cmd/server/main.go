@@ -602,7 +602,7 @@ func (ser *AgentServer) GetNetworkAwareness() {
 			localServerName = server.PodName
 		}
 	}
-	content, err1 := ioutil.ReadFile("node.txt")
+	content, err1 := ioutil.ReadFile("node/node.txt")
 	if err1 != nil {
 		fmt.Println("Error reading file:", err1)
 		return
@@ -620,9 +620,9 @@ func (ser *AgentServer) GetNetworkAwareness() {
 			packetLoss, avgRTT, err := runPingCommand(serverIp)
 			otherName,_ := ser.k8sCli.EtcdGet(serverName)
 			if err == nil {
-				ch <- fmt.Sprintf("%s and %s: %s\n", nodeName, otherName, result)
-				ch <- fmt.Sprintf("%s and %s: %s\n", nodeName, otherName, packetLoss)
-				ch <- fmt.Sprintf("%s and %s: %s\n", nodeName, otherName, avgRTT)
+				ch <- fmt.Sprintf("/%sand%s/bandwith: %s\n", nodeName, otherName, result)
+				ch <- fmt.Sprintf("/%sand%s/loss: %s\n", nodeName, otherName, packetLoss)
+				ch <- fmt.Sprintf("/%sand%s/delay: %s\n", nodeName, otherName, avgRTT)
 			} else {
 				ch <- fmt.Sprintf("%s\n", err)
 			}
@@ -633,7 +633,7 @@ func (ser *AgentServer) GetNetworkAwareness() {
 	for i := 0; i < (len(servers)-1)*3; i++ {
 		result.WriteString(<-ch)
 	}
-	err := os.WriteFile("data.txt", []byte(result.String()), 0644)
+	err := os.WriteFile("node/data.txt", []byte(result.String()), 0644)
 	if err != nil {
 		fmt.Println("Error writing to file:", err)
 	}
@@ -662,7 +662,7 @@ func extractLastLine(output string) string {
 
 // 实现客户端发送ping命令（测10次的平均时延以及数据丢失率）
 func runPingCommand(serverIp string) (string, string, error) {
-	cmd := exec.Command("ping", "-c", "100", serverIp)
+	cmd := exec.Command("ping", "-c", "50", serverIp)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	err := cmd.Run()
