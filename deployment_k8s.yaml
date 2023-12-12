@@ -14,9 +14,18 @@ spec:
         app: proxy-app
     spec:
       serviceAccountName: smart-agent-reader
+      volumes:
+      - name: node-volume
+        hostPath:
+          path: /home/cn/node/
+          type: DirectoryOrCreate
       containers:
         - name: my-agent
-          image: docker.io/zdszero/my-agent:latest
+          image: my-agent
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+          - name: node-volume
+            mountPath: /app/node/
           ports:
             - containerPort: 8081
               protocol: TCP
@@ -24,8 +33,7 @@ spec:
               protocol: TCP
             - containerPort: 8083
               protocol: UDP
-            - containerPort: 8084
-              protocol: UDP
+            
 
 ---
 apiVersion: v1
@@ -62,7 +70,4 @@ spec:
       protocol: TCP
       port: 8082
       targetPort: 8082
-    - name: "monitor-port"
-      protocol: TCP
-      port: 8084
-      targetPort: 8084
+    
